@@ -1,6 +1,7 @@
 import { $ } from 'bun'
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
+import { cors } from 'hono/cors'
 import * as fs from 'node:fs/promises'
 import * as path from 'path'
 import { nanoid } from '$lib/utils/nanoid'
@@ -17,6 +18,7 @@ import { db } from '$lib/db'
 import { git } from '$lib/db/schema'
 
 const app = new Hono()
+app.use(cors())
 app.use(logger())
 
 app.get(
