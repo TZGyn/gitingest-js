@@ -116,7 +116,7 @@ app.get(
 				)
 				.transform((url) => new URL(url))
 				.openapi({
-					example: 'https://github.com/TZGyn/shortener.git',
+					example: 'https://github.com/TZGyn/gitingest-js.git',
 				}),
 			branch: z.string().optional().openapi({ nullable: true }),
 			commit: z.string().optional().openapi({ nullable: true }),

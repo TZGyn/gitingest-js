@@ -1,11 +1,5 @@
-To install dependencies:
-```sh
-bun install
-```
+# GitIngest JS
 
-To run:
-```sh
-bun run dev
-```
+## A JS implementation of [gitingest](https://github.com/cyclotruc/gitingest) with caching and file parsing
 
-open http://localhost:3000
+This project is still in developing state
