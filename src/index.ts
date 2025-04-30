@@ -18,7 +18,7 @@ import { db } from '$lib/db'
 import { git } from '$lib/db/schema'
 
 const app = new Hono()
-app.use(cors({ origin: '*' }))
+app.use(cors())
 app.use(logger())
 
 app.get(
@@ -30,20 +30,12 @@ app.get(
 				version: '1.0.0',
 				description: 'API for greeting users',
 			},
-			servers:
-				Bun.env.APP_ENV === 'production'
-					? [
-							{
-								url: 'https://gitingest-js-production.up.railway.app',
-								description: 'Public Server',
-							},
-					  ]
-					: [
-							{
-								url: 'http://127.0.0.1:3000',
-								description: 'Local server',
-							},
-					  ],
+			servers: [
+				{
+					url: 'http://127.0.0.1:3000',
+					description: 'Local server',
+				},
+			],
 		},
 	}),
 )
