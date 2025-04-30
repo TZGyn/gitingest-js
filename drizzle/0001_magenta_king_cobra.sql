@@ -1,0 +1,1 @@
+ALTER TABLE "git" ADD CONSTRAINT "git_provider_repo_branch_commit_pk" PRIMARY KEY("provider","repo","branch","commit");
