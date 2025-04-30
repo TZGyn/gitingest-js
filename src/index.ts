@@ -176,7 +176,13 @@ app.get(
 		}
 
 		const files = await getAllFilesStats(dir, dir, {
-			excludeFiles: ['bun.lockb', 'bun.lock', 'package.lock'],
+			excludeFiles: [
+				'bun.lockb',
+				'bun.lock',
+				'package.lock',
+				'poetry.lock',
+				'Pipfile.lock',
+			],
 			excludeFolders: ['.git'],
 		})
 
