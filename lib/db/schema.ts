@@ -3,7 +3,7 @@ import { pgTable } from 'drizzle-orm/pg-core'
 export const git = pgTable('git', (t) => ({
 	provider: t
 		.varchar('provider', { length: 255 })
-		.$type<'github' | 'gitlab'>()
+		.$type<'github' | 'gitlab' | 'bitbucket'>()
 		.notNull(),
 	repo: t.text('repo').notNull(),
 	branch: t.text('branch').notNull(),
