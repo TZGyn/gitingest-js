@@ -2,7 +2,8 @@
 node_modules/
 
 # tmp folder for git cloning
-tmp/
+tmp/*
+!tmp/README.txt
 
 # environment variables
 .env
