@@ -35,10 +35,6 @@ app.get(
 					url: 'http://127.0.0.1:3000',
 					description: 'Local server',
 				},
-				{
-					url: 'https://gitingest-js-production.up.railway.app',
-					description: 'Public Server',
-				},
 			],
 		},
 	}),
