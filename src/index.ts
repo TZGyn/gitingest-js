@@ -18,7 +18,7 @@ import { db } from '$lib/db'
 import { git } from '$lib/db/schema'
 
 const app = new Hono()
-app.use(cors())
+app.use(cors({ origin: '*' }))
 app.use(logger())
 
 app.get(
