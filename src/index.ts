@@ -31,10 +31,15 @@ app.get(
 				description: 'API for greeting users',
 			},
 			servers: [
-				{
-					url: 'http://127.0.0.1:3000',
-					description: 'Local server',
-				},
+				Bun.env.APP_ENV === 'production'
+					? {
+							url: 'https://gitingest-js-production.up.railway.app',
+							description: 'Public Server',
+					  }
+					: {
+							url: 'http://127.0.0.1:3000',
+							description: 'Local server',
+					  },
 			],
 		},
 	}),
