@@ -1,6 +1,11 @@
-FROM oven/bun
+FROM oven/bun:debian
 
 WORKDIR /app
+
+# Install packages needed to build node modules
+RUN apt-get update -qq && \
+    apt-get install -y git 
+
 
 COPY ./package.json ./
 COPY ./bun.lock ./
