@@ -1,0 +1,8 @@
+# deps
+node_modules/
+
+# tmp folder for git cloning
+tmp/
+
+# environment variables
+.env
