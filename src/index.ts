@@ -154,7 +154,7 @@ app.get(
 				t.and(
 					t.eq(git.commit, useCommit),
 					t.eq(git.branch, branch || 'HEAD'),
-					t.eq(git.repo, repo.pathname.split('.')[0]),
+					t.eq(git.repo, repo.pathname.split('.')[0].substring(1)),
 					t.eq(git.provider, 'github'),
 				),
 		})
