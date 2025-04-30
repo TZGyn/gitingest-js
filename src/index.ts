@@ -197,7 +197,7 @@ app.get(
 				commit: useCommit,
 				files: files,
 				provider: 'github',
-				repo: repo.pathname.split('.')[0],
+				repo: repo.pathname.split('.')[0].substring(1),
 			})
 			.returning()
 
