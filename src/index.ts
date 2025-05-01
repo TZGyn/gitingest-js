@@ -31,15 +31,10 @@ app.get(
 				description: 'API for greeting users',
 			},
 			servers: [
-				Bun.env.APP_ENV === 'production' && Bun.env.APP_URL
-					? {
-							url: Bun.env.APP_URL,
-							description: 'Public Server',
-					  }
-					: {
-							url: 'http://127.0.0.1:3000',
-							description: 'Local server',
-					  },
+				{
+					url: Bun.env.APP_URL || 'http://127.0.0.1:3000',
+					description: 'Server',
+				},
 			],
 		},
 	}),
