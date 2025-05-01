@@ -112,13 +112,20 @@ app.get(
 				.refine(
 					(url) => {
 						try {
-							new URL(url)
+							const repo = new URL(url)
+							if (
+								!['github.com', 'gitlab.com'].includes(repo.hostname)
+							) {
+								return false
+							}
 							return true
 						} catch (error) {
 							return false
 						}
 					},
-					{ message: 'invalid url' },
+					{
+						message: 'Invalid url, must be github.com or gitlab.com',
+					},
 				)
 				.transform((url) => new URL(url))
 				.openapi({
@@ -130,10 +137,6 @@ app.get(
 	),
 	async (c) => {
 		const { branch, repo, commit } = c.req.valid('query')
-
-		if (!['github.com', 'gitlab.com'].includes(repo.hostname)) {
-			return c.text('invalid')
-		}
 
 		let useCommit: null | string = null
 		if (!commit) {
@@ -149,9 +152,9 @@ app.get(
 			return c.text('Unable to get commit')
 		}
 
-		const providers = {
-			'github.com': 'github' as const,
-			'gitlab.com': 'gitlab' as const,
+		const providers: Record<string, 'github' | 'gitlab'> = {
+			'github.com': 'github',
+			'gitlab.com': 'gitlab',
 		}
 
 		const existGitData = await db.query.git.findFirst({
@@ -160,10 +163,7 @@ app.get(
 					t.eq(git.commit, useCommit),
 					t.eq(git.branch, branch || 'HEAD'),
 					t.eq(git.repo, repo.pathname.split('.')[0].substring(1)),
-					t.eq(
-						git.provider,
-						providers[repo.hostname as 'github.com' | 'gitlab.com'],
-					),
+					t.eq(git.provider, providers[repo.hostname]),
 				),
 		})
 
