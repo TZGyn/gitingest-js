@@ -31,9 +31,9 @@ app.get(
 				description: 'API for greeting users',
 			},
 			servers: [
-				Bun.env.APP_ENV === 'production'
+				Bun.env.APP_ENV === 'production' && Bun.env.APP_URL
 					? {
-							url: 'https://gitingest-js-production.up.railway.app',
+							url: Bun.env.APP_URL,
 							description: 'Public Server',
 					  }
 					: {
