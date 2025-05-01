@@ -119,6 +119,7 @@ async function getAllFilesStats(
 										Description this image as detailed as possible
 										Dont make any unneccessary comments like "Here's a detailed description of the image"
 										The description is most likely going to be used to improve other llm's understanding of the image, so give as much details as possible
+										Only generate the description of the image, no chatting
 									`,
 								},
 								{ type: 'image', image: arrayBuffer },
