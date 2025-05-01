@@ -131,7 +131,7 @@ app.get(
 	async (c) => {
 		const { branch, repo, commit } = c.req.valid('query')
 
-		if (!['github.com'].includes(repo.hostname)) {
+		if (!['github.com', 'gitlab.com'].includes(repo.hostname)) {
 			return c.text('invalid')
 		}
 
@@ -149,13 +149,21 @@ app.get(
 			return c.text('Unable to get commit')
 		}
 
+		const providers = {
+			'github.com': 'github' as const,
+			'gitlab.com': 'gitlab' as const,
+		}
+
 		const existGitData = await db.query.git.findFirst({
 			where: (git, t) =>
 				t.and(
 					t.eq(git.commit, useCommit),
 					t.eq(git.branch, branch || 'HEAD'),
 					t.eq(git.repo, repo.pathname.split('.')[0].substring(1)),
-					t.eq(git.provider, 'github'),
+					t.eq(
+						git.provider,
+						providers[repo.hostname as 'github.com' | 'gitlab.com'],
+					),
 				),
 		})
 
