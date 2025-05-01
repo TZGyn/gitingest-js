@@ -115,7 +115,11 @@ async function getAllFilesStats(
 							content: [
 								{
 									type: 'text',
-									text: 'Description this image as detailed as possible',
+									text: `
+										Description this image as detailed as possible
+										Dont make any unneccessary comments like "Here's a detailed description of the image"
+										The description is most likely going to be used to improve other llm's understanding of the image, so give as much details as possible
+									`,
 								},
 								{ type: 'image', image: arrayBuffer },
 							],
