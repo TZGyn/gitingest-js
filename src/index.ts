@@ -18,6 +18,7 @@ import { db } from '$lib/db'
 import { git } from '$lib/db/schema'
 import { google, mistral } from '$lib/ai/model'
 import { generateText } from 'ai'
+import { OCRResponse } from '@mistralai/mistralai/models/components'
 
 const app = new Hono()
 app.use(cors())
@@ -66,7 +67,7 @@ async function getAllFilesStats(
 		path: string
 		type: string
 		content: string
-		pdfParsed?: any
+		pdfParsed?: OCRResponse
 		imageDescription?: string
 	}[] = []
 
@@ -147,6 +148,35 @@ async function getAllFilesStats(
 	return arrayOfFiles
 }
 
+const formatFiles = (
+	files: {
+		path: string
+		type: string
+		content: string
+		pdfParsed?: OCRResponse
+		imageDescription?: string
+	}[],
+) => {
+	const text = files
+		.map((file) => {
+			let output = '='.repeat(48)
+			output += '\n'
+			output += 'FILE: ' + file.path.split('/').pop()
+			output += '\n'
+			output += '='.repeat(48)
+			output += '\n'
+			output +=
+				file.type.split(';')[0] === 'application/pdf'
+					? JSON.stringify(file.pdfParsed)
+					: file.type.split(';')[0].startsWith('image/')
+					? file.imageDescription
+					: file.content
+			return output
+		})
+		.join('\n\n')
+	return text
+}
+
 app.get(
 	'/',
 	zValidator(
@@ -213,7 +243,8 @@ app.get(
 		})
 
 		if (existGitData) {
-			return c.json(existGitData)
+			const { files } = existGitData
+			return c.text(formatFiles(files as any))
 		}
 
 		const id = nanoid()
@@ -245,18 +276,15 @@ app.get(
 
 		await fs.rm(dir, { recursive: true, force: true })
 
-		const gitData = await db
-			.insert(git)
-			.values({
-				branch: branch || 'HEAD',
-				commit: useCommit,
-				files: files,
-				provider: 'github',
-				repo: repo.pathname.split('.')[0].substring(1),
-			})
-			.returning()
+		const gitData = await db.insert(git).values({
+			branch: branch || 'HEAD',
+			commit: useCommit,
+			files: files,
+			provider: 'github',
+			repo: repo.pathname.split('.')[0].substring(1),
+		})
 
-		return c.json(gitData[0])
+		return c.text(formatFiles(files))
 	},
 )
 
