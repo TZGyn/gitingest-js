@@ -16,6 +16,8 @@ import { z } from 'zod'
 import { getLatestCommit } from '$lib/utils/git/get-latest-commit'
 import { db } from '$lib/db'
 import { git } from '$lib/db/schema'
+import { google, mistral } from '$lib/ai/model'
+import { generateText } from 'ai'
 
 const app = new Hono()
 app.use(cors())
@@ -32,7 +34,7 @@ app.get(
 			},
 			servers: [
 				{
-					url: Bun.env.APP_URL || 'http://127.0.0.1:3000',
+					url: Bun.env.APP_URL || 'http://127.0.0.1:8080',
 					description: 'Server',
 				},
 			],
@@ -64,7 +66,8 @@ async function getAllFilesStats(
 		path: string
 		type: string
 		content: string
-		// stats: Stats
+		pdfParsed?: any
+		imageDescription?: string
 	}[] = []
 
 	for (const file of files) {
@@ -86,12 +89,53 @@ async function getAllFilesStats(
 			if (excludeFiles.includes(file)) {
 				continue
 			}
-			arrayOfFiles.push({
-				path: path.relative(rootPath, filePath),
-				type: bunFile.type,
-				content: await bunFile.text(),
-				// stats: fileStat,
-			})
+			if (bunFile.type.startsWith('application/pdf') && mistral) {
+				const base64 = (await bunFile.bytes()).toBase64()
+
+				arrayOfFiles.push({
+					path: path.relative(rootPath, filePath),
+					type: bunFile.type,
+					content: await bunFile.text(),
+					pdfParsed: await mistral.ocr.process({
+						model: 'mistral-ocr-latest',
+						document: {
+							type: 'document_url',
+							documentUrl: 'data:application/pdf;base64,' + base64,
+						},
+						includeImageBase64: true,
+					}),
+				})
+			} else if (bunFile.type.startsWith('image/') && google) {
+				const arrayBuffer = await bunFile.arrayBuffer()
+				const { text } = await generateText({
+					model: google('gemini-2.0-flash'),
+					messages: [
+						{
+							role: 'user',
+							content: [
+								{
+									type: 'text',
+									text: 'Description this image as detailed as possible',
+								},
+								{ type: 'image', image: arrayBuffer },
+							],
+						},
+					],
+				})
+
+				arrayOfFiles.push({
+					path: path.relative(rootPath, filePath),
+					type: bunFile.type,
+					content: await bunFile.text(),
+					imageDescription: text,
+				})
+			} else {
+				arrayOfFiles.push({
+					path: path.relative(rootPath, filePath),
+					type: bunFile.type,
+					content: await bunFile.text(),
+				})
+			}
 		}
 	}
 
