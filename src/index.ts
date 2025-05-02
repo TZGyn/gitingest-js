@@ -153,7 +153,7 @@ const formatFiles = (
 		.map((file) => {
 			let output = '='.repeat(48)
 			output += '\n'
-			output += 'FILE: ' + file.path.split('/').pop()
+			output += 'FILE: ' + file.path
 			output += '\n'
 			output += '='.repeat(48)
 			output += '\n'
