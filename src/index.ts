@@ -103,9 +103,7 @@ async function getAllFilesStats(rootPath: string, dirPath: string) {
 									type: 'text',
 									text: `
 										Description this image as detailed as possible
-										Dont make any unneccessary comments like "Here's a detailed description of the image"
 										The description is most likely going to be used to improve other llm's understanding of the image, so give as much details as possible
-										Only generate the description of the image, no chatting
 									`,
 								},
 								{ type: 'image', image: arrayBuffer },
@@ -142,6 +140,15 @@ const formatFiles = (
 		imageDescription?: string
 	}[],
 ) => {
+	const formatPDFResponse = (parsedPDF?: OCRResponse) => {
+		if (!parsedPDF) return ''
+
+		return parsedPDF.pages
+			.map((page) => {
+				return page.markdown + '\n'
+			})
+			.join('\n')
+	}
 	const text = files
 		.map((file) => {
 			let output = '='.repeat(48)
@@ -152,7 +159,7 @@ const formatFiles = (
 			output += '\n'
 			output +=
 				file.type.split(';')[0] === 'application/pdf'
-					? JSON.stringify(file.pdfParsed)
+					? formatPDFResponse(file.pdfParsed)
 					: file.type.split(';')[0].startsWith('image/')
 					? file.imageDescription
 					: file.content
