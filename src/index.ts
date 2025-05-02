@@ -5,7 +5,6 @@ import { cors } from 'hono/cors'
 import * as fs from 'node:fs/promises'
 import * as path from 'path'
 import { nanoid } from '$lib/utils/nanoid'
-import { Stats } from 'node:fs'
 
 // For extending the Zod schema with OpenAPI properties
 import 'zod-openapi/extend'
@@ -19,6 +18,7 @@ import { git } from '$lib/db/schema'
 import { google, mistral } from '$lib/ai/model'
 import { generateText } from 'ai'
 import { OCRResponse } from '@mistralai/mistralai/models/components'
+import { isIgnored } from '$lib/utils/git/ignore-patterns'
 
 const app = new Hono()
 app.use(cors())
@@ -51,17 +51,7 @@ app.get(
 	}),
 )
 
-async function getAllFilesStats(
-	rootPath: string,
-	dirPath: string,
-	{
-		excludeFiles,
-		excludeFolders,
-	}: {
-		excludeFiles: string[]
-		excludeFolders: string[]
-	},
-) {
+async function getAllFilesStats(rootPath: string, dirPath: string) {
 	const files = await fs.readdir(dirPath)
 	const arrayOfFiles: {
 		path: string
@@ -76,20 +66,15 @@ async function getAllFilesStats(
 		const bunFile = Bun.file(filePath)
 		const fileStat = await bunFile.stat()
 
+		if (isIgnored(path.relative(rootPath, filePath))) {
+			continue
+		}
+
 		if (fileStat.isDirectory()) {
-			if (excludeFolders.includes(file)) {
-				continue
-			}
 			arrayOfFiles.push(
-				...(await getAllFilesStats(rootPath, filePath, {
-					excludeFiles: excludeFiles,
-					excludeFolders: excludeFolders,
-				})),
+				...(await getAllFilesStats(rootPath, filePath)),
 			)
 		} else {
-			if (excludeFiles.includes(file)) {
-				continue
-			}
 			if (bunFile.type.startsWith('application/pdf') && mistral) {
 				const base64 = (await bunFile.bytes()).toBase64()
 
@@ -263,16 +248,7 @@ app.get(
 			await $`cd ${dir} && git checkout ${commit}`
 		}
 
-		const files = await getAllFilesStats(dir, dir, {
-			excludeFiles: [
-				'bun.lockb',
-				'bun.lock',
-				'package.lock',
-				'poetry.lock',
-				'Pipfile.lock',
-			],
-			excludeFolders: ['.git'],
-		})
+		const files = await getAllFilesStats(dir, dir)
 
 		await fs.rm(dir, { recursive: true, force: true })
 
