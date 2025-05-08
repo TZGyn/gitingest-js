@@ -27,7 +27,8 @@ app
 				},
 				servers: [
 					{
-						url: Bun.env.APP_URL || 'http://localhost:5173/api',
+						url:
+							Bun.env.APP_URL + '/api' || 'http://localhost:5173/api',
 						description: 'Server',
 					},
 				],
