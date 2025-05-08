@@ -9,41 +9,44 @@ import { Scalar } from '@scalar/hono-api-reference'
 
 // routes
 import { IngestRoute } from './routes/ingest'
+import { ChatRoute } from './routes/chat'
 
 const app = new Hono()
 
 app.use(cors())
 app.use(logger())
 
-app
-	.get(
-		'/openapi',
-		openAPISpecs(app, {
-			documentation: {
-				info: {
-					title: 'Hono',
-					version: '1.0.0',
-					description: 'API for greeting users',
-				},
-				servers: [
-					{
-						url:
-							Bun.env.APP_URL + '/api' || 'http://localhost:5173/api',
-						description: 'Server',
-					},
-				],
+app.get(
+	'/openapi',
+	openAPISpecs(app, {
+		documentation: {
+			info: {
+				title: 'Hono',
+				version: '1.0.0',
+				description: 'API for greeting users',
 			},
-		}),
-	)
-	.get(
-		'/docs',
-		Scalar({
-			theme: 'saturn',
-			url: '/api/openapi',
-		}),
-	)
+			servers: [
+				{
+					url:
+						Bun.env.APP_URL + '/api' || 'http://localhost:5173/api',
+					description: 'Server',
+				},
+			],
+		},
+	}),
+)
 
-const routes = app.route('/ingest', IngestRoute)
+app.get(
+	'/docs',
+	Scalar({
+		theme: 'saturn',
+		url: '/api/openapi',
+	}),
+)
+
+const routes = app
+	.route('/ingest', IngestRoute)
+	.route('/chat', ChatRoute)
 
 export const api = new Hono().route('/api', app)
 
