@@ -1,4 +1,4 @@
-import ignore = require('ignore')
+import ignore from 'ignore'
 
 // from gitingest (removed images (images are readable now) and some dotfiles (more context on the project))
 export const patterns = [

@@ -15,6 +15,8 @@ RUN bun install
 COPY . .
 # COPY ./.env.example ./.env
 
+RUN bun --bun run build
+
 EXPOSE 3000
 
-CMD ["bun", "src/index.js"]
+CMD ["bun", "build/index.js"]
