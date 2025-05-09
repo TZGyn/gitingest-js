@@ -48,19 +48,6 @@
 	})
 </script>
 
-<!-- svelte-ignore a11y_consider_explicit_label -->
-<!-- <button
-	onclick={async () => {
-		const tasks = await client.ingest.$get({
-			query: {
-				repo: repo,
-				branch,
-				commit,
-			},
-		})
-	}}>
-	Fetch
-</button> -->
 <div class="relative flex flex-1 overflow-hidden">
 	<div
 		bind:this={autoScroll.ref}

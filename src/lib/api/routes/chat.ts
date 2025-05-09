@@ -100,9 +100,11 @@ const app = new Hono().post(
 		})
 
 		let filesText: string
+		let currentCommit: string
 		if (existGitData) {
-			const { files } = existGitData
+			const { files, commit } = existGitData
 			filesText = formatFiles(files as any)
+			currentCommit = commit
 		} else {
 			const id = nanoid()
 			const dir = `tmp/${id}`
@@ -135,6 +137,7 @@ const app = new Hono().post(
 			})
 
 			filesText = formatFiles(files)
+			currentCommit = commit ?? 'latest'
 		}
 
 		let coreMessages = convertToCoreMessages(messages)
@@ -154,6 +157,11 @@ const app = new Hono().post(
 				dataStream.writeData({
 					type: 'message',
 					message: 'Generating Response',
+				})
+
+				dataStream.writeData({
+					type: 'commit',
+					commit: currentCommit,
 				})
 
 				const result = streamText({

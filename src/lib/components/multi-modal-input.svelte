@@ -99,6 +99,18 @@
 		input
 		adjustInputHeight()
 	})
+
+	$effect(() => {
+		const commitData = data?.find((data) => {
+			// @ts-ignore
+			return data?.type === 'commit'
+		})
+
+		if (commitData) {
+			// @ts-ignore
+			commit = commitData.commit
+		}
+	})
 </script>
 
 <form
