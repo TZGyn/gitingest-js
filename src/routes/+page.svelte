@@ -4,17 +4,15 @@
 	import MultiModalInput from '$lib/components/multi-modal-input.svelte'
 	import { UseAutoScroll } from '$lib/hooks/use-auto-scroll.svelte'
 	import { type ChatRequestOptions } from 'ai'
-	import * as Avatar from '$lib/components/ui/avatar/index.js'
 	import MessageBlock from '$lib/components/message/message-block.svelte'
 	import { cn } from '$lib/utils'
-	import { Loader2Icon, SparklesIcon } from '@lucide/svelte'
+	import {
+		Loader2Icon,
+		MessageCircleIcon,
+		SparklesIcon,
+	} from '@lucide/svelte'
 
 	const client = makeClient(fetch)
-
-	let provider = $state<'github' | 'gitlab'>('github')
-	let repo = $state('https://github.com/TZGyn/gitingest-js.git')
-	let branch = $state('')
-	let commit = $state('')
 
 	const autoScroll = new UseAutoScroll()
 
@@ -22,16 +20,29 @@
 		initialMessages: [],
 		api: '/api/chat',
 		onError: (error) => {
-			useChat.messages[useChat.messages.length - 1].annotations?.push(
-				{
-					type: 'kon_chat',
+			if (useChat.messages[useChat.messages.length - 1].annotations) {
+				useChat.messages[
+					useChat.messages.length - 1
+				].annotations?.push({
+					type: 'git_ingest',
 					status: 'error',
 					error: {
 						type: error.name,
 						message: error.message,
 					},
-				},
-			)
+				})
+			} else {
+				useChat.messages[useChat.messages.length - 1].annotations = [
+					{
+						type: 'git_ingest',
+						status: 'error',
+						error: {
+							type: error.name,
+							message: error.message,
+						},
+					},
+				]
+			}
 		},
 		credentials: 'include',
 	})
@@ -109,5 +120,30 @@
 	status={useChat.status}
 	{autoScroll}
 	stop={() => {
+		if (useChat.messages[useChat.messages.length - 1].annotations) {
+			useChat.messages[useChat.messages.length - 1].annotations?.push(
+				{
+					type: 'git_ingest',
+					status: 'error',
+					error: {
+						type: 'stopped_by_user',
+						message: 'Stopped By User',
+					},
+				},
+			)
+		} else {
+			useChat.messages[useChat.messages.length - 1].annotations = [
+				{
+					type: 'git_ingest',
+					status: 'error',
+					error: {
+						type: 'stopped_by_user',
+						message: 'Stopped By User',
+					},
+				},
+			]
+		}
+
 		useChat.stop()
+		console.log(useChat.messages)
 	}} />

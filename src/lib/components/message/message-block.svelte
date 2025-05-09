@@ -119,7 +119,7 @@
 
 			{#each message.annotations ?? [] as annotation}
 				{/* @ts-ignore */ null}
-				{#if annotation['type'] === 'kon_chat'}
+				{#if annotation['type'] === 'git_ingest'}
 					{/* @ts-ignore */ null}
 					{#if annotation?.status === 'error'}
 						<div

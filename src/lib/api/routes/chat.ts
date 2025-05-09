@@ -23,6 +23,40 @@ const app = new Hono().post(
 		'json',
 		z.object({
 			messages: z.any(),
+			repo: z
+				.string()
+				.refine(
+					(url) => {
+						try {
+							const repo = new URL(url)
+							if (
+								!['github.com', 'gitlab.com'].includes(repo.hostname)
+							) {
+								return false
+							}
+							return true
+						} catch (error) {
+							return false
+						}
+					},
+					{
+						message: 'Invalid url, must be github.com or gitlab.com',
+					},
+				)
+				.transform((url) => new URL(url))
+				.openapi({
+					example: 'https://github.com/TZGyn/gitingest-js.git',
+				}),
+			branch: z
+				.string()
+				.optional()
+				.nullable()
+				.openapi({ nullable: true }),
+			commit: z
+				.string()
+				.optional()
+				.nullable()
+				.openapi({ nullable: true }),
 		}),
 	),
 	async (c) => {
@@ -45,15 +79,15 @@ const app = new Hono().post(
 				// 	model: 'Google Gemini Flash',
 				// })
 
-				dataStream.writeData({
-					type: 'message',
-					message: 'Understanding prompt',
-				})
+				// dataStream.writeData({
+				// 	type: 'message',
+				// 	message: 'Understanding prompt',
+				// })
 
-				dataStream.writeData({
-					type: 'message',
-					message: 'Generating Response',
-				})
+				// dataStream.writeData({
+				// 	type: 'message',
+				// 	message: 'Generating Response',
+				// })
 
 				const additionalSystemPrompt = {
 					chat: `
