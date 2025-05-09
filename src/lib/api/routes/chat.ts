@@ -16,6 +16,11 @@ import {
 	smoothStream,
 	streamText,
 } from 'ai'
+import { formatFiles } from '$lib/utils/files/format-files'
+import { nanoid } from '$lib/utils/nanoid'
+import { getAllFilesStats } from '$lib/utils/files/get-all-files-stats'
+import { $ } from 'bun'
+import * as fs from 'node:fs/promises'
 
 const app = new Hono().post(
 	'/',
@@ -63,7 +68,74 @@ const app = new Hono().post(
 		if (!google) {
 			return c.text('Chat not enabled', { status: 500 })
 		}
-		const { messages } = c.req.valid('json')
+		const { messages, repo, branch, commit } = c.req.valid('json')
+
+		let useCommit: null | string = null
+		if (!commit) {
+			useCommit = await getLatestCommit({
+				url: repo.toString(),
+				branch,
+			})
+		} else {
+			useCommit = commit
+		}
+
+		if (!useCommit) {
+			return c.text('Unable to get commit')
+		}
+
+		const providers: Record<string, 'github' | 'gitlab'> = {
+			'github.com': 'github',
+			'gitlab.com': 'gitlab',
+		}
+
+		const existGitData = await db.query.git.findFirst({
+			where: (git, t) =>
+				t.and(
+					t.eq(git.commit, useCommit),
+					t.eq(git.branch, branch || 'HEAD'),
+					t.eq(git.repo, repo.pathname.split('.')[0].substring(1)),
+					t.eq(git.provider, providers[repo.hostname]),
+				),
+		})
+
+		let filesText: string
+		if (existGitData) {
+			const { files } = existGitData
+			filesText = formatFiles(files as any)
+		} else {
+			const id = nanoid()
+			const dir = `tmp/${id}`
+			const cloneArgs = []
+			if (!commit) {
+				cloneArgs.push('--depth=1')
+			}
+			if (branch && !['main', 'master'].includes(branch)) {
+				cloneArgs.push('--branch', branch)
+			}
+			console.log(
+				`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`,
+			)
+			await $`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`
+
+			if (commit) {
+				await $`cd ${dir} && git checkout ${commit}`
+			}
+
+			const files = await getAllFilesStats(dir, dir)
+
+			await fs.rm(dir, { recursive: true, force: true })
+
+			const gitData = await db.insert(git).values({
+				branch: branch || 'HEAD',
+				commit: useCommit,
+				files: files,
+				provider: 'github',
+				repo: repo.pathname.split('.')[0].substring(1),
+			})
+
+			filesText = formatFiles(files)
+		}
 
 		let coreMessages = convertToCoreMessages(messages)
 
@@ -74,76 +146,25 @@ const app = new Hono().post(
 				...c.res.headers,
 			},
 			execute: async (dataStream) => {
-				// dataStream.writeMessageAnnotation({
-				// 	type: 'model',
-				// 	model: 'Google Gemini Flash',
-				// })
+				dataStream.writeData({
+					type: 'message',
+					message: 'Understanding prompt',
+				})
 
-				// dataStream.writeData({
-				// 	type: 'message',
-				// 	message: 'Understanding prompt',
-				// })
-
-				// dataStream.writeData({
-				// 	type: 'message',
-				// 	message: 'Generating Response',
-				// })
-
-				const additionalSystemPrompt = {
-					chat: `
-						YOU ARE NOT ALLOWED TO CALL ANY TOOLS, DONT USE PREVIOUS CHATS TO FAKE CALL TOOLS
-						ONLY TREAT THIS AS TEXT TO TEXT CHAT
-
-						You have also been given image generation tool, do not ask for confirmation, just relay the user request
-						The tool can also take in an image url if its use for editing, please decide whether or not to include an image url based on the context
-						Example: If an user ask to generate an image of a cat, then ask to give it clothes, please provide the image url for editing
-						Another example: if an user ask to generate an image of a cat with transparent background
-						Dont say back to the user you cant generate a transparent background 
-						Just use the tool and let the user see the result themselves
-
-						Remember to evaluate after using the tools
-						
-						IMPORTANT NOTES FOR IMAGE GENERATION TOOL: ONCE YOU RECEIVE THE FILES URL, THE IMAGE GENERATION IS CONSIDERED DONE
-					`,
-					x_search: `
-						You have been given an ability to search X(formerly Twitter)'s posts
-						'You MUST run the tool first exactly once'
-						DO NOT ASK THE USER FOR CONFIRMATION!
-					`,
-					web_search: `
-						You have been given a web search ability, 
-						'You MUST run the tool first exactly once'
-						DO NOT ASK THE USER FOR CONFIRMATION!
-					`,
-					academic_search: `
-						You have been given an ability to search academic papers
-						'You MUST run the tool first exactly once'
-						DO NOT ASK THE USER FOR CONFIRMATION!
-					`,
-					web_reader: `
-						You have been given an ability to fetch url as markdown 
-						'You MUST run the tool first exactly once'
-						DO NOT ASK THE USER FOR CONFIRMATION!
-					`,
-					image: `
-						You have been given an ability to generate image 
-						'You MUST run the tool first exactly once'
-						USE 1:1 aspect ratio if not specified and 1 image as default unless specified
-						DO NOT ASK THE USER FOR CONFIRMATION!
-					`,
-					'gpt-image-1': `
-						You have been given an ability to generate image 
-						'You MUST run the tool first exactly once'
-						USE 1:1 aspect ratio if not specified and 1 image as default unless specified
-						DO NOT ASK THE USER FOR CONFIRMATION!
-					`,
-				}
+				dataStream.writeData({
+					type: 'message',
+					message: 'Generating Response',
+				})
 
 				const result = streamText({
 					model: model,
 					messages: coreMessages,
 					system: `
-						You are a chat assistant
+						You are a git repo chat assistant, the repo files had been processed into text format and it will be given to you as context
+						Users will ask questions about the repo, you can use the files texts provided to you to answer their prompts
+
+						Here are the files:
+						${filesText}
 
 						Today's Date: ${new Date().toLocaleDateString('en-US', {
 							year: 'numeric',

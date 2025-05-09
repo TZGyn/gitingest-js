@@ -12,10 +12,10 @@ import { z } from 'zod'
 import { getLatestCommit } from '$lib/utils/git/get-latest-commit'
 import { db } from '$lib/db'
 import { git } from '$lib/db/schema'
-import { google, mistral } from '$lib/ai/model'
-import { generateText } from 'ai'
 import { type OCRResponse } from '@mistralai/mistralai/models/components'
 import { isIgnored } from '$lib/utils/git/ignore-patterns'
+import { getAllFilesStats } from '$lib/utils/files/get-all-files-stats'
+import { formatFiles } from '$lib/utils/files/format-files'
 
 const app = new Hono().get(
 	'/',
@@ -118,123 +118,5 @@ const app = new Hono().get(
 		return c.text(formatFiles(files))
 	},
 )
-
-async function getAllFilesStats(rootPath: string, dirPath: string) {
-	const files = await fs.readdir(dirPath)
-	const arrayOfFiles: {
-		path: string
-		type: string
-		content: string
-		pdfParsed?: OCRResponse
-		imageDescription?: string
-	}[] = []
-
-	for (const file of files) {
-		const filePath = path.join(dirPath, file)
-		const bunFile = Bun.file(filePath)
-		const fileStat = await bunFile.stat()
-
-		if (isIgnored(path.relative(rootPath, filePath))) {
-			continue
-		}
-
-		if (fileStat.isDirectory()) {
-			arrayOfFiles.push(
-				...(await getAllFilesStats(rootPath, filePath)),
-			)
-		} else {
-			if (bunFile.type.startsWith('application/pdf') && mistral) {
-				const base64 = (await bunFile.bytes()).toBase64()
-
-				arrayOfFiles.push({
-					path: path.relative(rootPath, filePath),
-					type: bunFile.type,
-					content: await bunFile.text(),
-					pdfParsed: await mistral.ocr.process({
-						model: 'mistral-ocr-latest',
-						document: {
-							type: 'document_url',
-							documentUrl: 'data:application/pdf;base64,' + base64,
-						},
-						includeImageBase64: true,
-					}),
-				})
-			} else if (bunFile.type.startsWith('image/') && google) {
-				const arrayBuffer = await bunFile.arrayBuffer()
-				const { text } = await generateText({
-					model: google('gemini-2.0-flash'),
-					messages: [
-						{
-							role: 'user',
-							content: [
-								{
-									type: 'text',
-									text: `
-										Description this image as detailed as possible
-										The description is most likely going to be used to improve other llm's understanding of the image, so give as much details as possible
-									`,
-								},
-								{ type: 'image', image: arrayBuffer },
-							],
-						},
-					],
-				})
-
-				arrayOfFiles.push({
-					path: path.relative(rootPath, filePath),
-					type: bunFile.type,
-					content: await bunFile.text(),
-					imageDescription: text,
-				})
-			} else {
-				arrayOfFiles.push({
-					path: path.relative(rootPath, filePath),
-					type: bunFile.type,
-					content: await bunFile.text(),
-				})
-			}
-		}
-	}
-
-	return arrayOfFiles
-}
-
-const formatFiles = (
-	files: {
-		path: string
-		type: string
-		content: string
-		pdfParsed?: OCRResponse
-		imageDescription?: string
-	}[],
-) => {
-	const formatPDFResponse = (parsedPDF?: OCRResponse) => {
-		if (!parsedPDF) return ''
-
-		return parsedPDF.pages
-			.map((page) => {
-				return page.markdown + '\n'
-			})
-			.join('\n')
-	}
-	const text = files
-		.map((file) => {
-			let output = '='.repeat(48)
-			output += '\n'
-			output += 'FILE: ' + file.path
-			output += '\n'
-			output += '='.repeat(48)
-			output += '\n'
-			output +=
-				file.type.split(';')[0] === 'application/pdf'
-					? formatPDFResponse(file.pdfParsed)
-					: file.type.split(';')[0].startsWith('image/')
-						? file.imageDescription
-						: file.content
-			return output
-		})
-		.join('\n\n')
-	return text
-}
 
 export { app as IngestRoute }

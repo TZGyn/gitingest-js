@@ -5,7 +5,7 @@ export const getLatestCommit = async ({
 	branch,
 }: {
 	url: string
-	branch?: string
+	branch?: string | null
 }) => {
 	try {
 		const commit = (
