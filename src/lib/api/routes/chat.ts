@@ -15,12 +15,15 @@ import {
 	generateText,
 	smoothStream,
 	streamText,
+	tool,
 } from 'ai'
 import { formatFiles } from '$lib/utils/files/format-files'
 import { nanoid } from '$lib/utils/nanoid'
 import { getAllFilesStats } from '$lib/utils/files/get-all-files-stats'
 import { $ } from 'bun'
 import * as fs from 'node:fs/promises'
+import type { OCRResponse } from '@mistralai/mistralai/models/components'
+import { normalize } from '$lib/utils/files/normalize-path'
 
 const app = new Hono().post(
 	'/',
@@ -70,76 +73,6 @@ const app = new Hono().post(
 		}
 		const { messages, repo, branch, commit } = c.req.valid('json')
 
-		let useCommit: null | string = null
-		if (!commit) {
-			useCommit = await getLatestCommit({
-				url: repo.toString(),
-				branch,
-			})
-		} else {
-			useCommit = commit
-		}
-
-		if (!useCommit) {
-			return c.text('Unable to get commit')
-		}
-
-		const providers: Record<string, 'github' | 'gitlab'> = {
-			'github.com': 'github',
-			'gitlab.com': 'gitlab',
-		}
-
-		const existGitData = await db.query.git.findFirst({
-			where: (git, t) =>
-				t.and(
-					t.eq(git.commit, useCommit),
-					t.eq(git.branch, branch || 'HEAD'),
-					t.eq(git.repo, repo.pathname.split('.')[0].substring(1)),
-					t.eq(git.provider, providers[repo.hostname]),
-				),
-		})
-
-		let filesText: string
-		let currentCommit: string
-		if (existGitData) {
-			const { files, commit } = existGitData
-			filesText = formatFiles(files as any)
-			currentCommit = commit
-		} else {
-			const id = nanoid()
-			const dir = `tmp/${id}`
-			const cloneArgs = []
-			if (!commit) {
-				cloneArgs.push('--depth=1')
-			}
-			if (branch && !['main', 'master'].includes(branch)) {
-				cloneArgs.push('--branch', branch)
-			}
-			console.log(
-				`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`,
-			)
-			await $`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`
-
-			if (commit) {
-				await $`cd ${dir} && git checkout ${commit}`
-			}
-
-			const files = await getAllFilesStats(dir, dir)
-
-			await fs.rm(dir, { recursive: true, force: true })
-
-			const gitData = await db.insert(git).values({
-				branch: branch || 'HEAD',
-				commit: useCommit,
-				files: files,
-				provider: 'github',
-				repo: repo.pathname.split('.')[0].substring(1),
-			})
-
-			filesText = formatFiles(files)
-			currentCommit = commit ?? 'latest'
-		}
-
 		let coreMessages = convertToCoreMessages(messages)
 
 		const model = google('gemini-2.0-flash')
@@ -156,6 +89,101 @@ const app = new Hono().post(
 
 				dataStream.writeData({
 					type: 'message',
+					message: 'Fetching repo data',
+				})
+
+				let useCommit: null | string = null
+				if (!commit) {
+					useCommit = await getLatestCommit({
+						url: repo.toString(),
+						branch,
+					})
+				} else {
+					useCommit = commit
+				}
+
+				if (!useCommit) {
+					dataStream.writeMessageAnnotation({
+						type: 'git_ingest',
+						status: 'error',
+						error: {
+							type: 'invalid_data',
+							message: 'Unable to get commit data',
+						},
+					})
+					return
+				}
+
+				const providers: Record<string, 'github' | 'gitlab'> = {
+					'github.com': 'github',
+					'gitlab.com': 'gitlab',
+				}
+
+				const existGitData = await db.query.git.findFirst({
+					where: (git, t) =>
+						t.and(
+							t.eq(git.commit, useCommit),
+							t.eq(git.branch, branch || 'HEAD'),
+							t.eq(
+								git.repo,
+								repo.pathname.split('.')[0].substring(1),
+							),
+							t.eq(git.provider, providers[repo.hostname]),
+						),
+				})
+
+				let currentCommit: string
+				let files: {
+					path: string
+					type: string
+					content: string
+					pdfParsed?: OCRResponse
+					imageDescription?: string
+				}[]
+				if (existGitData) {
+					const { files: filesData, commit } = existGitData
+					files = filesData as any
+
+					currentCommit = commit
+				} else {
+					const id = nanoid()
+					const dir = `tmp/${id}`
+					const cloneArgs = []
+					if (!commit) {
+						cloneArgs.push('--depth=1')
+					}
+					if (branch && !['main', 'master'].includes(branch)) {
+						cloneArgs.push('--branch', branch)
+					}
+					console.log(
+						`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`,
+					)
+					await $`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`
+
+					if (commit) {
+						await $`cd ${dir} && git checkout ${commit}`
+					}
+
+					const filesData = await getAllFilesStats(dir, dir)
+
+					await fs.rm(dir, { recursive: true, force: true })
+
+					const gitData = await db.insert(git).values({
+						branch: branch || 'HEAD',
+						commit: useCommit,
+						files: filesData,
+						provider: 'github',
+						repo: repo.pathname.split('.')[0].substring(1),
+					})
+
+					files = filesData
+					currentCommit = commit ?? 'latest'
+				}
+
+				const paths = files.map((file) => file.path)
+
+				dataStream.writeData({
+					type: 'message',
 					message: 'Generating Response',
 				})
 
@@ -169,10 +197,13 @@ const app = new Hono().post(
 					messages: coreMessages,
 					system: `
 						You are a git repo chat assistant, the repo files had been processed into text format and it will be given to you as context
-						Users will ask questions about the repo, you can use the files texts provided to you to answer their prompts
+						Users will ask questions about the repo, you can use the file paths provided to you to answer their prompts
+						To get the file content, use the paths (max 30 at one time) to the get their content, you can decided on your own which path to use
+						For example, if the user ask to summarize the entire codebase, u can repeatedly call the function to get the content of all files
+						Make sure to stop once u got the data you wanted
 
-						Here are the files:
-						${filesText}
+						Here are the file paths (use it in the tool calling to get the file content):
+						${paths.join('\n')}
 
 						Today's Date: ${new Date().toLocaleDateString('en-US', {
 							year: 'numeric',
@@ -221,15 +252,35 @@ const app = new Hono().post(
 					`,
 					providerOptions: {},
 					abortSignal: c.req.raw.signal,
-					maxSteps: 5,
-					// experimental_activeTools: [...activeTools(mode)],
+					maxSteps: 100,
+					tools: {
+						getFiles: tool({
+							parameters: z.object({
+								filePaths: z
+									.string()
+									.array()
+									.describe(
+										'File paths (max 30 at the time), if its small files like prettierrc.json, u can include 100 of them, make sure the file content doesnt exceed 1 million tokens since you will crash',
+									),
+							}),
+							execute: async ({ filePaths }) => {
+								const filesData = files.filter((file) => {
+									return filePaths.includes(normalize(file.path))
+								})
+
+								const filesText = formatFiles(filesData)
+
+								return { content: filesText }
+							},
+						}),
+					},
 					onError: (error) => {
 						console.log('Error', error)
 					},
-					experimental_transform: smoothStream({
-						delayInMs: 20, // optional: defaults to 10ms
-						chunking: 'word', // optional: defaults to 'word'
-					}),
+					// experimental_transform: smoothStream({
+					// 	delayInMs: 20, // optional: defaults to 10ms
+					// 	chunking: 'word', // optional: defaults to 'word'
+					// }),
 				})
 
 				result.mergeIntoDataStream(dataStream, {
