@@ -1,15 +1,13 @@
 <script lang="ts">
-	import * as Avatar from '$lib/components/ui/avatar'
 	import { cn } from '$lib/utils'
 	import type { JSONValue, UIMessage } from 'ai'
-	import { Button } from '$lib/components/ui/button'
-	import { Loader2Icon, SplitIcon, SquareIcon } from 'lucide-svelte'
+	import { Loader2Icon, SquareIcon } from 'lucide-svelte'
 	import GoogleGroundingSection from '$lib/components/google-grounding-section.svelte'
 	import Markdown from '../markdown'
-	import Attachments from './attachments.svelte'
 	import CopyButton from '$lib/components/copy-button.svelte'
 	import Reasoning from '../markdown/reasoning.svelte'
 	import { SparklesIcon } from '@lucide/svelte'
+	import ToolInvocation from './tool-invocation.svelte'
 
 	let {
 		isLast,
@@ -82,7 +80,11 @@
 			{#if message.parts.length > 0}
 				<div class="flex w-full flex-col gap-5">
 					{#each message.parts as part, index (index)}
-						{#if part.type === 'reasoning'}
+						{#if part.type === 'tool-invocation'}
+							<ToolInvocation
+								toolInvocation={part.toolInvocation}
+								{message} />
+						{:else if part.type === 'reasoning'}
 							<Reasoning reasoning={part.reasoning} />
 						{:else if part.type === 'text'}
 							<div
@@ -103,7 +105,6 @@
 					{/each}
 				</div>
 			{/if}
-			<Attachments attachments={message.experimental_attachments} />
 
 			{#each message.annotations ?? [] as annotation}
 				{/* @ts-ignore */ null}

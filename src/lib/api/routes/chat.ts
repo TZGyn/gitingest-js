@@ -89,108 +89,16 @@ const app = new Hono().post(
 
 				dataStream.writeData({
 					type: 'message',
-					message: 'Fetching repo data',
+					message: 'Generating Response',
 				})
 
-				let useCommit: null | string = null
-				if (!commit) {
-					useCommit = await getLatestCommit({
-						url: repo.toString(),
-						branch,
-					})
-				} else {
-					useCommit = commit
-				}
-
-				if (!useCommit) {
-					dataStream.writeMessageAnnotation({
-						type: 'git_ingest',
-						status: 'error',
-						error: {
-							type: 'invalid_data',
-							message: 'Unable to get commit data',
-						},
-					})
-					return
-				}
-
-				const providers: Record<string, 'github' | 'gitlab'> = {
-					'github.com': 'github',
-					'gitlab.com': 'gitlab',
-				}
-
-				const existGitData = await db.query.git.findFirst({
-					where: (git, t) =>
-						t.and(
-							t.eq(git.commit, useCommit),
-							t.eq(git.branch, branch || 'HEAD'),
-							t.eq(
-								git.repo,
-								repo.pathname.split('.')[0].substring(1),
-							),
-							t.eq(git.provider, providers[repo.hostname]),
-						),
-				})
-
-				let currentCommit: string
 				let files: {
 					path: string
 					type: string
 					content: string
 					pdfParsed?: OCRResponse
 					imageDescription?: string
-				}[]
-				if (existGitData) {
-					const { files: filesData, commit } = existGitData
-					files = filesData as any
-
-					currentCommit = commit
-				} else {
-					const id = nanoid()
-					const dir = `tmp/${id}`
-					const cloneArgs = []
-					if (!commit) {
-						cloneArgs.push('--depth=1')
-					}
-					if (branch && !['main', 'master'].includes(branch)) {
-						cloneArgs.push('--branch', branch)
-					}
-					console.log(
-						`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`,
-					)
-					await $`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`
-
-					if (commit) {
-						await $`cd ${dir} && git checkout ${commit}`
-					}
-
-					const filesData = await getAllFilesStats(dir, dir)
-
-					await fs.rm(dir, { recursive: true, force: true })
-
-					const gitData = await db.insert(git).values({
-						branch: branch || 'HEAD',
-						commit: useCommit,
-						files: filesData,
-						provider: 'github',
-						repo: repo.pathname.split('.')[0].substring(1),
-					})
-
-					files = filesData
-					currentCommit = commit ?? 'latest'
-				}
-
-				const paths = files.map((file) => file.path)
-
-				dataStream.writeData({
-					type: 'message',
-					message: 'Generating Response',
-				})
-
-				dataStream.writeData({
-					type: 'commit',
-					commit: currentCommit,
-				})
+				}[] = []
 
 				const result = streamText({
 					model: model,
@@ -202,8 +110,7 @@ const app = new Hono().post(
 						For example, if the user ask to summarize the entire codebase, u can repeatedly call the function to get the content of all files
 						Make sure to stop once u got the data you wanted
 
-						Here are the file paths (use it in the tool calling to get the file content):
-						${paths.join('\n')}
+						Use the tool getRepo to get all the file paths in the repo
 
 						Today's Date: ${new Date().toLocaleDateString('en-US', {
 							year: 'numeric',
@@ -254,6 +161,106 @@ const app = new Hono().post(
 					abortSignal: c.req.raw.signal,
 					maxSteps: 100,
 					tools: {
+						getRepo: tool({
+							description: 'Fetch Repo Data, must use at the start',
+							parameters: z.object({}),
+							execute: async ({}) => {
+								let useCommit: null | string = null
+								if (!commit) {
+									useCommit = await getLatestCommit({
+										url: repo.toString(),
+										branch,
+									})
+								} else {
+									useCommit = commit
+								}
+
+								if (!useCommit) {
+									dataStream.writeMessageAnnotation({
+										type: 'git_ingest',
+										status: 'error',
+										error: {
+											type: 'invalid_data',
+											message: 'Unable to get commit data',
+										},
+									})
+									return
+								}
+
+								const providers: Record<string, 'github' | 'gitlab'> =
+									{
+										'github.com': 'github',
+										'gitlab.com': 'gitlab',
+									}
+
+								const existGitData = await db.query.git.findFirst({
+									where: (git, t) =>
+										t.and(
+											t.eq(git.commit, useCommit),
+											t.eq(git.branch, branch || 'HEAD'),
+											t.eq(
+												git.repo,
+												repo.pathname.split('.')[0].substring(1),
+											),
+											t.eq(git.provider, providers[repo.hostname]),
+										),
+								})
+
+								let currentCommit: string
+								if (existGitData) {
+									const { files: filesData, commit } = existGitData
+									files = filesData as any
+
+									currentCommit = commit
+								} else {
+									const id = nanoid()
+									const dir = `tmp/${id}`
+									const cloneArgs = []
+									if (!commit) {
+										cloneArgs.push('--depth=1')
+									}
+									if (
+										branch &&
+										!['main', 'master'].includes(branch)
+									) {
+										cloneArgs.push('--branch', branch)
+									}
+									console.log(
+										`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`,
+									)
+									await $`git clone ${repo} ${cloneArgs.join(' ')} tmp/${id}`
+
+									if (commit) {
+										await $`cd ${dir} && git checkout ${commit}`
+									}
+
+									const filesData = await getAllFilesStats(dir, dir)
+
+									await fs.rm(dir, { recursive: true, force: true })
+
+									const gitData = await db.insert(git).values({
+										branch: branch || 'HEAD',
+										commit: useCommit,
+										files: filesData,
+										provider: 'github',
+										repo: repo.pathname.split('.')[0].substring(1),
+									})
+
+									files = filesData
+									currentCommit = commit ?? 'latest'
+								}
+
+								dataStream.writeData({
+									type: 'commit',
+									commit: currentCommit,
+								})
+
+								const paths = files.map((file) => file.path)
+								return {
+									paths,
+								}
+							},
+						}),
 						getFiles: tool({
 							parameters: z.object({
 								filePaths: z
