@@ -275,7 +275,10 @@ const app = new Hono().post(
 							}),
 							execute: async ({ filePaths }) => {
 								const filesData = files.filter((file) => {
-									return filePaths.includes(normalize(file.path))
+									return (
+										filePaths.includes(normalize(file.path)) ||
+										filePaths.includes('/' + normalize(file.path))
+									)
 								})
 
 								const filesText = formatFiles(filesData)
