@@ -24,6 +24,7 @@ import { $ } from 'bun'
 import * as fs from 'node:fs/promises'
 import type { OCRResponse } from '@mistralai/mistralai/models/components'
 import { normalize } from '$lib/utils/files/normalize-path'
+import { pathsort } from '$lib/utils/files/path-sort'
 
 const app = new Hono().post(
 	'/',
@@ -255,9 +256,11 @@ const app = new Hono().post(
 									commit: currentCommit,
 								})
 
-								const paths = files.map((file) => file.path)
+								const paths = files.map((file) =>
+									normalize(file.path),
+								)
 								return {
-									paths,
+									paths: pathsort(paths),
 								}
 							},
 						}),
