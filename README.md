@@ -7,6 +7,7 @@
 ## Chat
 
 ![chat](./docs/chat-example.png)
+![file-explorer](./docs/file-explorer-example.png)
 
 ## Change Repo
 
