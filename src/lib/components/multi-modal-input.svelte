@@ -146,7 +146,7 @@
 				<Dialog.Trigger
 					class={cn(
 						buttonVariants({ variant: 'outline' }),
-						'hover:bg-background/60 rounded-xl',
+						'dark:bg-background cursor-pointer rounded-xl dark:hover:bg-black/60',
 					)}>
 					{#if provider === 'github'}
 						<GithubIcon />
