@@ -21,7 +21,11 @@
 	import { Input } from '$lib/components/ui/input/index.js'
 	import { Label } from '$lib/components/ui/label/index.js'
 	import { cn } from '$lib/utils'
-	import { GithubIcon, GitlabIcon } from '$lib/components/icons'
+	import {
+		GithubIcon,
+		GitIcon,
+		GitlabIcon,
+	} from '$lib/components/icons'
 	import { capitalizeFirstLetter } from '$lib/utils/capitalize-first-letter'
 
 	let {
@@ -53,7 +57,7 @@
 
 	let openRepoDialog = $state(false)
 
-	let provider = $state<'github' | 'gitlab'>('github')
+	let provider = $state<'github' | 'gitlab' | 'custom'>('github')
 	let url = $state('https://github.com/TZGyn/gitingest-js.git')
 	let repo = $state('TZGyn/gitingest-js')
 	let branch = $state('main')
@@ -152,6 +156,8 @@
 						<GithubIcon />
 					{:else if provider === 'gitlab'}
 						<GitlabIcon />
+					{:else}
+						<GitIcon />
 					{/if}
 					{repo}
 				</Dialog.Trigger>
@@ -164,6 +170,8 @@
 									<GithubIcon class="size-32" />
 								{:else if provider === 'gitlab'}
 									<GitlabIcon class="size-32" />
+								{:else}
+									<GitIcon class="size-32" />
 								{/if}
 							</div>
 						</div>
@@ -187,9 +195,11 @@
 										return
 									}
 									if (urlData.hostname === 'github.com') {
-										provider === 'github'
+										provider = 'github'
 									} else if (urlData.hostname === 'gitlab.com') {
-										provider === 'gitlab'
+										provider = 'gitlab'
+									} else {
+										provider = 'custom'
 									}
 
 									repo = urlData.pathname
@@ -216,6 +226,8 @@
 										<GithubIcon />
 									{:else if provider === 'gitlab'}
 										<GitlabIcon />
+									{:else}
+										<GitIcon />
 									{/if}
 									{capitalizeFirstLetter(provider)}
 								</DropdownMenu.Trigger>
@@ -250,6 +262,13 @@
 											}}>
 											<GitlabIcon />
 											Gitlab
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											onclick={() => {
+												provider = 'custom'
+											}}>
+											<GitIcon />
+											Custom
 										</DropdownMenu.Item>
 									</DropdownMenu.Group>
 								</DropdownMenu.Content>
