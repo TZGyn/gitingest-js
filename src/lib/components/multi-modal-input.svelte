@@ -120,7 +120,7 @@
 		class="absolute right-1/2 bottom-[calc(100%+0.5rem)] flex translate-x-1/2 flex-col gap-2">
 		{#if !autoScroll?.isAtBottom}
 			<Button
-				class="rounded-full"
+				class="dark:bg-background dark:hover:bg-accent rounded-full"
 				variant="outline"
 				size="icon"
 				onclick={() => autoScroll?.scrollToBottom()}>
