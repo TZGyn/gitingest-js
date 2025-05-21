@@ -29,12 +29,7 @@ const app = new Hono().post(
 				.refine(
 					(url) => {
 						try {
-							const repo = new URL(url)
-							if (
-								!['github.com', 'gitlab.com'].includes(repo.hostname)
-							) {
-								return false
-							}
+							new URL(url)
 							return true
 						} catch (error) {
 							return false
